@@ -1,0 +1,8 @@
+langchain
+langchain-google-genai
+langchain-community
+langchain-text-splitters
+python-dotenv
+psycopg2-binary
+pgvector
+streamlit
