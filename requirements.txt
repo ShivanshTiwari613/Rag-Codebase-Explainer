@@ -7,4 +7,4 @@ streamlit
 chromadb
 sentence-transformers
 langchain-chroma
-
+tiktoken

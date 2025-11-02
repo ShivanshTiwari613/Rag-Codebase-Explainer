@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 # Import our modular backend components
 from src.data_processing.loader import load_and_chunk_codebase
 from src.rag_pipeline.qa_chain import create_rag_chain
-from src.vector_store.neon_db_manager import ChromaDBManager
+from src.vector_store.chroma_cloud_manager import ChromaDBManager
 
 
 # --- Helper functions ---
