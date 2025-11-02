@@ -262,6 +262,44 @@ def load_and_chunk_codebase(file_path: str) -> List[Document]:
     if not documents:
         raise ValueError("No readable documents were loaded from the provided file.")
 
+    original_doc_count = len(documents)
+
+    # Build a lightweight repository inventory document to help answer broad questions.
+    inventory_lines = [
+        "Repository inventory snapshot:",
+        f"Total files processed: {original_doc_count}",
+    ]
+    for doc in documents:
+        src = doc.metadata.get("source")
+        rel_path = _relative_path(src, base_dir)
+        language = _get_language_for_path(src)
+        line_count = len(doc.page_content.splitlines())
+        preview_line = ""
+        for line in doc.page_content.splitlines():
+            stripped = line.strip()
+            if stripped:
+                preview_line = stripped[:120]
+                break
+        description = f"- {rel_path} ({language}, {line_count} lines)"
+        if preview_line:
+            description += f" – {preview_line}"
+        inventory_lines.append(description)
+
+    inventory_source = (
+        str((base_dir / "__inventory__.md").resolve())
+        if base_dir
+        else "__inventory__.md"
+    )
+    inventory_doc = Document(
+        page_content="\n".join(inventory_lines),
+        metadata={
+            "source": inventory_source,
+            "synthetic": True,
+            "language": "markdown",
+        },
+    )
+    documents.append(inventory_doc)
+
     chunked_documents: List[Document] = []
 
     for doc in documents:
@@ -312,7 +350,9 @@ def load_and_chunk_codebase(file_path: str) -> List[Document]:
             chunk.metadata = metadata
             chunked_documents.append(chunk)
 
-    print(f"Successfully loaded and chunked {len(documents)} document(s) into {len(chunked_documents)} chunks.")
+    print(
+        f"Successfully loaded and chunked {original_doc_count} document(s) into {len(chunked_documents)} chunks."
+    )
 
     return chunked_documents
 

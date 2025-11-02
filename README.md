@@ -24,7 +24,9 @@ How to run (basic):
 Notes:
 - Each ingestion creates (or reuses) a Chroma collection of your choice. Give it a memorable name in the sidebar before uploading.
 - Embeddings are uploaded directly to your configured Chroma Cloud database; there is no local persistence.
-- The chunker is character-based; for production you should switch to a token-aware splitter.
+- Chunking uses a token-aware splitter with per-file language heuristics to keep chunks consistent across mixed-language projects.
+- The chat interface keeps the latest conversation context for each upload so follow-up questions stay grounded.
+- Retrieval blends semantic vectors with a BM25 keyword retriever; adjust the weight slider in the UI to favor either signal.
 
 ### Inspecting the Chroma store
 
