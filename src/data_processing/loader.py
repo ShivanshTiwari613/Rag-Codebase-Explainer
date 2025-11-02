@@ -1,6 +1,5 @@
 # src/data_processing/loader.py
 
-import os
 import tempfile
 import zipfile
 from pathlib import Path
@@ -32,6 +31,16 @@ LANGUAGE_MAP = {
 }
 
 
+def _load_with_fallback(path: str) -> List[Document]:
+    """Load a single file using TextLoader with encoding fallbacks."""
+    loader = TextLoader(
+        path,
+        encoding="utf-8",
+        autodetect_encoding=True,
+    )
+    return loader.load()
+
+
 def load_and_chunk_codebase(file_path: str) -> List[Document]:
     """
     Loads a codebase from a file path (can be a single file or a zip archive),
@@ -44,40 +53,47 @@ def load_and_chunk_codebase(file_path: str) -> List[Document]:
         List[Document]: A list of chunked documents, ready for embedding.
     """
     documents = []
-    
+
     if zipfile.is_zipfile(file_path):
         # If the file is a zip archive, extract it to a temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
                 zip_ref.extractall(temp_dir)
-            
+
             # Use DirectoryLoader to load all supported files from the extracted content
-            # We specify a glob to include a wide range of common code/text files
             loader = DirectoryLoader(
-                temp_dir, 
+                temp_dir,
                 glob="**/*.*",
                 show_progress=True,
                 use_multithreading=True,
-                loader_cls=TextLoader  # Use TextLoader for all files
+                loader_cls=TextLoader,
+                loader_kwargs={
+                    "encoding": "utf-8",
+                    "autodetect_encoding": True,
+                },
+                silent_errors=True,
             )
             documents = loader.load()
 
     else:
         # If it's a single file, load it directly
-        loader = TextLoader(file_path, encoding="utf-8")
-        documents = loader.load()
+        documents = _load_with_fallback(file_path)
+
+    if not documents:
+        raise ValueError("No readable documents were loaded from the provided file.")
 
     # Get the file extension to determine the language for the splitter
     file_extension = Path(documents[0].metadata.get("source", "")).suffix
-    language = LANGUAGE_MAP.get(file_extension, "python") # Default to python
+    language = LANGUAGE_MAP.get(file_extension, "python")  # Default to python
 
     # Initialize a text splitter that is aware of code structures
     text_splitter = RecursiveCharacterTextSplitter.from_language(
         language=language, chunk_size=2000, chunk_overlap=200
     )
-    
+
     chunked_documents = text_splitter.split_documents(documents)
-    
+
     print(f"Successfully loaded and chunked {len(documents)} document(s) into {len(chunked_documents)} chunks.")
 
     return chunked_documents
+

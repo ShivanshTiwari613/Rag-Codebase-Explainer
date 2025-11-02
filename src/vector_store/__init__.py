@@ -1,5 +1,5 @@
-"""Vector store package: Neon (or other) vector DB manager."""
+"""Vector store package: local Chroma vector DB manager."""
 
-from .neon_db_manager import NeonDBManager
+from .neon_db_manager import ChromaDBManager
 
-__all__ = ["NeonDBManager"]
+__all__ = ["ChromaDBManager"]

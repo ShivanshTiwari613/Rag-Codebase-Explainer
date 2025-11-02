@@ -1,12 +1,12 @@
 # src/rag_pipeline/qa_chain.py
 
-from operator import itemgetter
 from typing import List
 
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough, Runnable
+from langchain_core.runnables import Runnable
+from langchain_core.runnables import RunnableLambda
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from src.config import GEMINI_API_KEY
@@ -33,9 +33,6 @@ def create_rag_chain(retriever) -> Runnable:
         A LangChain runnable object that expects a question string and returns
         a dictionary with "answer" and "source_documents".
     """
-    # 1. Define the Prompt Template
-    # This template is crucial. It instructs the LLM on how to behave, telling it
-    # to base its answer strictly on the provided context.
     prompt_template = """
 You are an expert programming assistant. Your task is to answer questions about a codebase.
 Answer the user's question based ONLY on the following context of source code snippets.
@@ -53,35 +50,21 @@ ANSWER:
 """
     prompt = ChatPromptTemplate.from_template(prompt_template)
 
-    # 2. Initialize the LLM
-    # We use Gemini Pro, setting a low temperature for more factual, less creative answers.
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
-        google_api_key=GEMINI_API_KEY, 
+        model="gemini-2.5-flash",
+        google_api_key=GEMINI_API_KEY,
         temperature=0.1,
-        convert_system_message_to_human=True # Helps with some models
+        convert_system_message_to_human=True,
     )
 
-    # 3. Build the RAG Chain using LCEL (LangChain Expression Language)
-    
-    # This part of the chain is responsible for getting the documents
-    # and passing the question through.
-    retrieval_and_context_chain = RunnableParallel(
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-    )
-    
-    # This is the main chain that combines retrieval, prompt, and LLM.
-    # The final output is a dictionary containing the generated answer
-    # and the source documents that were used as context.
-    rag_chain = (
-        {
-            "source_documents": retriever, 
-            "question": RunnablePassthrough()
-        }
-        | {
-            "answer": retrieval_and_context_chain | prompt | llm | StrOutputParser(),
-            "source_documents": itemgetter("source_documents"),
-        }
-    )
+    output_parser = StrOutputParser()
 
-    return rag_chain
+    def run_chain(question: str):
+        docs = retriever.invoke(question)
+        formatted_context = format_docs(docs)
+        prompt_value = prompt.format(context=formatted_context, question=question)
+        llm_result = llm.invoke(prompt_value)
+        answer = output_parser.invoke(llm_result)
+        return {"answer": answer, "source_documents": docs}
+
+    return RunnableLambda(run_chain)
